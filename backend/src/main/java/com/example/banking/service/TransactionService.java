@@ -49,7 +49,15 @@ public class TransactionService {
         idempotencyKeyRepository.save(key);
 
         // Ensure user exists and is approved
-        userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        com.example.banking.model.User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        if (!user.isApproved()) {
+            throw new RuntimeException("User not approved");
+        }
+
+        // Validate amount
+        if (amount == null || amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Amount must be positive");
+        }
 
         // Lock or create balance row (pessimistic)
         Optional<Balance> maybeBal = balanceRepository.findByUserIdForUpdate(userId);
