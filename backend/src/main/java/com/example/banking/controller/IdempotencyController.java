@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -46,17 +50,29 @@ public class IdempotencyController {
     }
 
     @GetMapping("")
-    public ResponseEntity<?> list(@RequestParam(name = "days", required = false) Integer days) {
-        List<IdempotencyKey> all = repo.findAll();
-        OffsetDateTime cutoff = days == null ? null : OffsetDateTime.now().minusDays(days);
-        List<Map<String, Object>> out = all.stream().filter(k -> cutoff == null || k.getCreatedAt().isAfter(cutoff)).map(k -> Map.of(
-                "id", k.getId(),
-                "keyValue", k.getKeyValue(),
-                "userId", k.getUserId(),
-                "createdAt", k.getCreatedAt(),
-                "transactionId", k.getTransactionId()
-        )).toList();
-        return ResponseEntity.ok(out);
+    public ResponseEntity<?> list(@RequestParam(name = "days", required = false) Integer days,
+                  @RequestParam(name = "page", required = false, defaultValue = "0") int page,
+                  @RequestParam(name = "size", required = false, defaultValue = "20") int size) {
+    List<IdempotencyKey> all = repo.findAll();
+    OffsetDateTime cutoff = days == null ? null : OffsetDateTime.now().minusDays(days);
+    List<Map<String, Object>> filtered = all.stream().filter(k -> cutoff == null || k.getCreatedAt().isAfter(cutoff)).map(k -> Map.of(
+        "id", k.getId(),
+        "keyValue", k.getKeyValue(),
+        "userId", k.getUserId(),
+        "createdAt", k.getCreatedAt(),
+        "transactionId", k.getTransactionId()
+    )).toList();
+    int start = Math.max(0, Math.min(filtered.size(), page * size));
+    int end = Math.min(filtered.size(), start + size);
+    List<Map<String, Object>> pageContent = filtered.subList(start, end);
+    Page<Map<String, Object>> pg = new PageImpl<>(pageContent, PageRequest.of(page, size), filtered.size());
+    return ResponseEntity.ok(Map.of(
+        "content", pg.getContent(),
+        "page", pg.getNumber(),
+        "size", pg.getSize(),
+        "totalElements", pg.getTotalElements(),
+        "totalPages", pg.getTotalPages()
+    ));
     }
 
     @DeleteMapping("/cleanup")
