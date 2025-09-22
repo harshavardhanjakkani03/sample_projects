@@ -47,6 +47,9 @@ public class TransactionIntegrationTest {
         headers.set("Idempotency-Key", "abc-123");
         HttpEntity<?> entity = new HttpEntity<>(headers);
 
+        // approve user before performing transactions (app requires approved users)
+        restTemplate.postForEntity("http://localhost:" + port + "/api/admin/users/" + userId + "/approve", null, Object.class);
+
     ResponseEntity<Transaction> t1 = restTemplate.exchange("http://localhost:" + port + "/api/transactions?userId=" + userId + "&amount=10&type=deposit&channel=ATM", HttpMethod.POST, entity, Transaction.class);
     assertThat(t1.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(t1.getBody()).isNotNull();
