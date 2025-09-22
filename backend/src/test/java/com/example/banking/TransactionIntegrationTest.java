@@ -29,8 +29,19 @@ public class TransactionIntegrationTest {
         req.setName("Sue");
         req.setPassword("secret");
         ResponseEntity response = restTemplate.postForEntity("http://localhost:" + port + "/api/register", req, Object.class);
-        // get user id from created resource
-        Integer userId = ((java.util.LinkedHashMap)((java.util.Map)response.getBody()).get("id")).intValue();
+        // get user id from created resource robustly
+        Object body = response.getBody();
+        Integer userId;
+        if (body instanceof java.util.Map) {
+            Object idObj = ((java.util.Map) body).get("id");
+            if (idObj instanceof Number) {
+                userId = ((Number) idObj).intValue();
+            } else {
+                userId = Integer.valueOf(idObj.toString());
+            }
+        } else {
+            throw new RuntimeException("Unexpected response body type: " + (body == null ? "null" : body.getClass()));
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Idempotency-Key", "abc-123");
