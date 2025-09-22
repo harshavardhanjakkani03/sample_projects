@@ -79,4 +79,20 @@ public class IdempotencyControllerTest {
                 .andExpect(jsonPath("$.deleted").value(1));
         verify(repo, atLeastOnce()).delete(old);
     }
+
+        @Test
+        public void getReturnsRawStringWhenResultJsonInvalid() throws Exception {
+                IdempotencyKey bad = new IdempotencyKey();
+                bad.setId(9L);
+                bad.setKeyValue("bad-json");
+                bad.setUserId(7L);
+                bad.setCreatedAt(OffsetDateTime.now());
+                bad.setResultJson("not-a-json");
+
+                when(repo.findByKeyValue("bad-json")).thenReturn(Optional.of(bad));
+
+                mvc.perform(get("/api/idempotency/bad-json")).andExpect(status().isOk())
+                                .andExpect(jsonPath("$.keyValue").value("bad-json"))
+                                .andExpect(jsonPath("$.result").value("not-a-json"));
+        }
 }
