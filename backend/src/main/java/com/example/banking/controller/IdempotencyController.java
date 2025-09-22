@@ -53,25 +53,29 @@ public class IdempotencyController {
     public ResponseEntity<?> list(@RequestParam(name = "days", required = false) Integer days,
                   @RequestParam(name = "page", required = false, defaultValue = "0") int page,
                   @RequestParam(name = "size", required = false, defaultValue = "20") int size) {
-    List<IdempotencyKey> all = repo.findAll();
     OffsetDateTime cutoff = days == null ? null : OffsetDateTime.now().minusDays(days);
-    List<Map<String, Object>> filtered = all.stream().filter(k -> cutoff == null || k.getCreatedAt().isAfter(cutoff)).map(k -> Map.of(
+    Pageable pageable = PageRequest.of(page, size);
+    Page<IdempotencyKey> keyPage;
+    if (cutoff != null) {
+        keyPage = repo.findByCreatedAtAfter(cutoff, pageable);
+    } else {
+        keyPage = repo.findAll(pageable);
+    }
+
+    List<Map<String, Object>> content = keyPage.stream().map(k -> Map.of(
         "id", k.getId(),
         "keyValue", k.getKeyValue(),
         "userId", k.getUserId(),
         "createdAt", k.getCreatedAt(),
         "transactionId", k.getTransactionId()
     )).toList();
-    int start = Math.max(0, Math.min(filtered.size(), page * size));
-    int end = Math.min(filtered.size(), start + size);
-    List<Map<String, Object>> pageContent = filtered.subList(start, end);
-    Page<Map<String, Object>> pg = new PageImpl<>(pageContent, PageRequest.of(page, size), filtered.size());
+
     return ResponseEntity.ok(Map.of(
-        "content", pg.getContent(),
-        "page", pg.getNumber(),
-        "size", pg.getSize(),
-        "totalElements", pg.getTotalElements(),
-        "totalPages", pg.getTotalPages()
+        "content", content,
+        "page", keyPage.getNumber(),
+        "size", keyPage.getSize(),
+        "totalElements", keyPage.getTotalElements(),
+        "totalPages", keyPage.getTotalPages()
     ));
     }
 

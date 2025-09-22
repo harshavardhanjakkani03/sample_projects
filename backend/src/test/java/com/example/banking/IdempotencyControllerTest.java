@@ -42,13 +42,16 @@ public class IdempotencyControllerTest {
         k1.setCreatedAt(OffsetDateTime.now());
         k1.setResultJson("{\"transactionId\":100}");
 
-        when(repo.findAll()).thenReturn(List.of(k1));
+        // mock paged responses
+        org.springframework.data.domain.PageImpl<IdempotencyKey> page = new org.springframework.data.domain.PageImpl<>(List.of(k1), org.springframework.data.domain.PageRequest.of(0,20), 1);
+        when(repo.findByCreatedAtAfter(any(java.time.OffsetDateTime.class), any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
+        when(repo.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
         when(repo.findByKeyValue("key-1")).thenReturn(Optional.of(k1));
 
         // list
         mvc.perform(get("/api/idempotency?days=30")).andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].keyValue").value("key-1"));
+                .andExpect(jsonPath("$.content[0].keyValue").value("key-1"));
 
         // get single (parsed result)
         mvc.perform(get("/api/idempotency/key-1")).andExpect(status().isOk())
