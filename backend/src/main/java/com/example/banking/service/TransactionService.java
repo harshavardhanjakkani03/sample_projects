@@ -8,6 +8,8 @@ import com.example.banking.repository.TransactionRepository;
 import com.example.banking.repository.UserRepository;
 import com.example.banking.repository.BalanceRepository;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,8 @@ import java.util.Optional;
 
 @Service
 public class TransactionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
 
     private final TransactionRepository transactionRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
@@ -32,6 +36,7 @@ public class TransactionService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Transaction createTransaction(Long userId, BigDecimal amount, String type, String channel, String idempotencyKey) {
+        log.info("createTransaction userId={} amount={} type={} channel={} idempotencyKey={}", userId, amount, type, channel, idempotencyKey);
         // Check idempotency
         Optional<IdempotencyKey> existing = idempotencyKeyRepository.findByKeyValue(idempotencyKey);
         if (existing.isPresent()) {
@@ -42,11 +47,12 @@ public class TransactionService {
             throw new com.example.banking.exception.IdempotencyInProgressException("Idempotent request in progress");
         }
 
-        // Reserve idempotency key first
+    // Reserve idempotency key first
         IdempotencyKey key = new IdempotencyKey();
         key.setKeyValue(idempotencyKey);
         key.setUserId(userId);
         idempotencyKeyRepository.save(key);
+    log.debug("Reserved idempotency key {} for user {}", idempotencyKey, userId);
 
         // Ensure user exists and is approved
         com.example.banking.model.User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
@@ -95,6 +101,7 @@ public class TransactionService {
         t.setType(type);
         t.setChannel(channel);
         Transaction saved = transactionRepository.save(t);
+    log.info("Created transaction id={} for user={}", saved.getId(), userId);
 
         // update idempotency with transaction id and optional result
         key.setTransactionId(saved.getId());
